@@ -15,7 +15,6 @@ class Shortener < EM::Connection
    end
 
   def process_http_request
-    redis = EM::Protocols::Redis.connect
     path  = @http_request_uri.to_s
     query = @http_query_string.to_s
 
@@ -27,9 +26,9 @@ class Shortener < EM::Connection
         params = URI.decode_www_form(query)
         url = params.assoc('url').last.chomp
         
-        redis.keys '*' do |result|
+        REDIS.keys '*' do |result|
           key = result.size.base62_encode
-          redis.set key, url do |result|
+          REDIS.set key, url do |result|
             response.status = 200
             response.content_type 'text/html'
             response.content = "http://localhost:9000/#{key}"
@@ -43,7 +42,7 @@ class Shortener < EM::Connection
         response.send_response
       end
     else
-      redis.get path[1..-1] do |result|
+      REDIS.get path[1..-1] do |result|
         response.status = 302
         response.headers["Location"] = result
         response.send_response
@@ -53,5 +52,6 @@ class Shortener < EM::Connection
 end
 
 EM.run{
+  REDIS = EM::Protocols::Redis.connect
   EM.start_server '0.0.0.0', 9000, Shortener
 }
